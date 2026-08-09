@@ -22,7 +22,7 @@ function setupTransactionsSheet(ss) {
   
   // 清除現有內容與格式
   sheet.clear();
-  sheet.setGridlinesGivenInternal(true);
+  sheet.setHiddenGridlines(false);
   
   // 表頭 Row 1
   var headers = [
@@ -80,7 +80,7 @@ function setupDividendsSheet(ss) {
   var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
   
   sheet.clear();
-  sheet.setGridlinesGivenInternal(true);
+  sheet.setHiddenGridlines(false);
   
   // 表頭 Row 1
   var headers = [
@@ -130,7 +130,7 @@ function setupDashboardSheet(ss) {
   var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
   
   sheet.clear();
-  sheet.setGridlinesGivenInternal(true);
+  sheet.setHiddenGridlines(false);
   
   // -------------------------------------------------------------
   // 區域 1: 全域總覽 (Block A1:B6)
