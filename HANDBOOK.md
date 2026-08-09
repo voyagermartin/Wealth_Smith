@@ -82,25 +82,46 @@ XIRR 需要建構嚴謹的時間軸與帶符號現金流數組：
 ### 2. GAS 模組架構規劃 (Script Architecture)
 ```text
 Wealth_Smith_GAS/
-├── Code.gs          // 系統主入口、自訂選單 (Custom Menu) 與觸發器綁定
-├── XIRREngine.gs    // 核心計算引擎：自動演算個股與整體 XIRR
-├── PriceFetcher.gs  // 股價抓取與備援機制 (GOOGLEFINANCE / Web Scraping)
-└── SheetSetup.gs    // 初始化工具：自動建立三張工作表、表頭格式與資料驗證規則
+├── Wealth_Smith.gs  // 系統主入口、自訂頂部選單與每日收盤觸發器 (setupDailyTrigger)
+├── SheetSetup.gs    // 初始化工具：自動建立三張工作表 (Transactions, Dividends, Dashboard) 與格式驗證
+├── XIRREngine.gs    // 核心計算引擎：Newton-Raphson 演算法，自動精算個股與全域 XIRR
+├── PriceFetcher.gs  // 股價抓取與備援機制 (Yahoo Finance API / 證交所 TWSE API)
+├── .clasp.json      // Google Clasp 專案部署設定檔
+└── appsscript.json  // GAS 時區 (Asia/Taipei) 與執行環境設定檔
 ```
 
 ---
 
 ## 四、 專案開工四步驟 (Implementation Roadmap)
 
-* **Phase 1: 試算表結構與格式初始化（Anti 執行中）**
+* **Phase 1: 試算表結構與格式初始化（✅ 已完成）**
   * 建立 `Transactions`、`Dividends`、`Dashboard` 三張工作表與標準表頭。
   * 設定資料驗證（日期格式、交易類型下拉選單）與條件式格式。
-* **Phase 2: 基礎試算表公式與現價整合**
+* **Phase 2: 基礎試算表公式與現價整合（✅ 已完成）**
   * 設定各表內部自動加減與累計公式。
-  * 導入 `GOOGLEFINANCE` 抓取當前報價。
-* **Phase 3: GAS XIRR 核心演算法與自訂函數開發**
-  * 寫入 `XIRREngine.gs`，實現支援跨表整合的 XIRR 計算。
+  * 導入 `GOOGLEFINANCE` 與 `PriceFetcher` 抓取當前報價。
+* **Phase 3: GAS XIRR 核心演算法與自訂函數開發（✅ 已完成）**
+  * 寫入 `XIRREngine.gs`，實現支援跨表整合的 Newton-Raphson XIRR 計算。
   * 於 Dashboard 產出動態 XIRR 結果。
-* **Phase 4: 自動化觸發與使用者體驗優化**
+* **Phase 4: 自動化觸發與使用者體驗優化（✅ 已完成）**
   * 新增 Google Sheets 頂部選單「Wealth_Smith 儀表板」。
-  * 設定每日收盤自動更新與股息發放提醒通知。
+  * 實作 `setupDailyTrigger()` 設定每日 14:30 收盤自動更新與 CI/CD `clasp push` 自動化部署。
+
+---
+
+## 五、 開發日誌 (Development Log)
+
+### 📅 2026-08-09
+* **專案初始化與版本控制**：
+  * 建立系統開發手冊 [HANDBOOK.md](file:///f:/Projects/Wealth_Smith/HANDBOOK.md) 與 [.gitignore](file:///f:/Projects/Wealth_Smith/.gitignore)。
+  * 初始化本地 Git 儲存庫並連動 GitHub 遠端儲存庫 (`main` 分支)。
+* **Phase 1 & Phase 2 試算表結構開發**：
+  * 開發 `SheetSetup.gs` 模組，實現一鍵自動建立並格式化 `Transactions`、`Dividends` 與 `Dashboard` 三大工作表。
+  * 加入資料驗證 (下拉選單 `買入`/`賣出`)、`yyyy-mm-dd` 日期格式化與加總公式，並注入 initial 測試資料 (`2330.TW`)。
+* **Phase 3 XIRR 計算引擎與現價備援**：
+  * 開發 `XIRREngine.gs` 核心演算法，基於 Newton-Raphson 法與 Bisection 備援，支援個股與全域投資組合不定期現金流內部報酬率 (XIRR) 精算。
+  * 開發 `PriceFetcher.gs` 模組，整合 Yahoo Finance API 與台灣證交所 (TWSE) API 作為 `GOOGLEFINANCE` 的即時備援。
+* **Phase 4 頂部選單、排程觸發器與 Clasp 自動化部署**：
+  * 開發 `Wealth_Smith.gs` 系統主入口，於 Google Sheets 注入「Wealth_Smith 儀表板」自訂選單。
+  * 實作 `setupDailyTrigger()` 函數，可一鍵設定每日 14:30 股市收盤自動背景更新。
+  * 配置 `.clasp.json` 與 `.claspignore`，完成 Google Clasp CLI 工具繫結授權，實現全自動一鍵部署程式碼至 Google Sheet 線上 Apps Script 專案。
