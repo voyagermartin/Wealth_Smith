@@ -10,7 +10,10 @@ function setupAllSheets() {
   setupDividendsSheet(ss);
   setupDashboardSheet(ss);
   
-  SpreadsheetApp.getUi().alert('✅ Wealth_Smith 核心工作表結構與測試資料已成功初始化！');
+  // 自動執行一次 XIRR 數值計算
+  updateAllXIRR();
+  
+  SpreadsheetApp.getUi().alert('✅ Wealth_Smith 核心工作表結構、測試資料與 XIRR 計算已成功初始化！');
 }
 
 /**
