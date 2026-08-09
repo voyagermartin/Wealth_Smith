@@ -1,0 +1,106 @@
+# Wealth_Smith：GAS 存股金流自動化管理系統開發手冊 (Handbook)
+
+## 專案核心理念
+結合 Google Sheets 的彈性介面與 Google Apps Script (GAS) 的自動化引擎，實現買賣交易、股息流向、個股與整體投資組合的 XIRR、總成本與總報酬率即時精算，打造被動收入自動化追蹤利器。
+
+---
+
+## 一、 團隊協作角色權責 (Roles & Responsibilities)
+* **產品架構師 / 總指揮 (腦袋 - Gemini)**： 負責系統架構設計、演算法邏輯（如 XIRR 現金流計算）、資料庫表單規劃、驗收標準定義與撰寫執行指令 (Prompts)。
+* **工程實作師 (施工 - AntiGravity)**： 負責建立 Google Sheets 結構、寫入 GAS 腳本代碼、測試執行、除錯與佈署排程觸發器 (Triggers)。
+* **專案擁有者 (Martin)**： 需求審查、成果驗收與系統最終使用。
+
+---
+
+## 二、 系統核心架構與資料表規劃 (Database Architecture)
+
+### 1. 工作表一：Transactions（買賣交易明細）
+記錄每一次進場買進與賣出之交易資料。
+
+| 欄位名稱 (A-I) | 欄位代號 | 型態 | 說明與格式範例 |
+| :--- | :--- | :--- | :--- |
+| 交易日期 | Date | Date | YYYY-MM-DD（例如：2026-01-15） |
+| 股票代號 | Ticker | Text | 台股請加副檔名，如 2330.TW, 0050.TW |
+| 股票名稱 | Name | Text | 例如：台積電、元大台灣50 |
+| 交易類型 | Type | Dropdown | 買入 / 賣出 |
+| 成交均價 | Price | Number | 每股成交價格 |
+| 購買股數 | Shares | Number | 交易股數 |
+| 投資金額 | Amount | Formula/Number | 成交均價 × 購買股數 |
+| 手續費 | Fee | Number | 券商手續費（交易實際支出） |
+| 淨現金流 | NetCashFlow | Formula | 買入：-(投資金額 + 手續費)<br>賣出：+(投資金額 - 手續費) |
+
+### 2. 工作表二：Dividends（股息紀錄）
+記錄除息與實際股息入帳狀況。
+
+| 欄位名稱 (A-G) | 欄位代號 | 型態 | 說明與格式範例 |
+| :--- | :--- | :--- | :--- |
+| 除息日 | ExDate | Date | YYYY-MM-DD |
+| 發放日 | PayDate | Date | YYYY-MM-DD（實務上以此日期作為 XIRR 現金流入日） |
+| 股票代號 | Ticker | Text | 例如：0050.TW |
+| 每股股利 | DPS | Number | 每股配發現金股利金額 |
+| 持有股數 | SharesHeld | Number | 除息時持有的總股數 |
+| 總股利金額 | TotalDividend | Formula/Number | 每股股利 × 持有股數（或實際扣稅扣匯費後入帳金額） |
+| 淨現金流 | NetCashFlow | Formula | +總股利金額（正現金流） |
+
+### 3. 工作表三：Dashboard（總覽與個股儀表板）
+
+#### (A) 全域投資總覽 (Global Summary)
+| 指標名稱 | 計算邏輯 / 公式說明 |
+| :--- | :--- |
+| 總投入成本 | 所有 Transactions 買入金額 + 手續費之總和 |
+| 總股息收入 | 所有 Dividends 總股利金額之總和 |
+| 總當下市值 | 各個股（累積股數 × 當前即時股價）之總和 |
+| 總損益 (Unrealized + Dividend) | (總當下市值 + 總股息收入) - 總投入成本 |
+| 總報酬率 (%) | 總損益 / 總投入成本 |
+| 整體 XIRR (%) | 由 GAS 整合所有歷史交易買賣現金流(-)、歷史股息現金流(+)與今日當下總市值(+)進行不定期現金流內部報酬率演算。 |
+
+#### (B) 個股彙整表 (Per-Stock Breakdowns)
+| 欄位 | 計算來源與說明 |
+| :--- | :--- |
+| 投資標的 (Ticker) | 股票代號（如 2330.TW）與名稱 |
+| 個股總投入成本 | 該標的於 Transactions 之買入金額與手續費加總 |
+| 累積股數 | 該標的（買進股數 - 賣出股數）之累計值 |
+| 平均持股成本 | 個股總投入成本 / 累積股數 |
+| 當前現價 | 由 GOOGLEFINANCE("TICKER", "price") 或 GAS 爬蟲即時更新 |
+| 個股目前總市值 | 累積股數 × 當前現價 |
+| 個股總股息收入 | 該標的於 Dividends 之總股利加總 |
+| 個股總報酬率 (%) | [(個股目前總市值 + 個股總股息收入) - 個股總投入成本] / 個股總投入成本 |
+| 個股 XIRR (%) | 由 GAS 提取該標的專屬之交易現金流、股息現金流及今日變現市值進行計算。 |
+
+---
+
+## 三、 演算法邏輯與 GAS 模組規劃 (Technical Implementation)
+
+### 1. XIRR 核心計算邏輯 (Cash Flow Model)
+XIRR 需要建構嚴謹的時間軸與帶符號現金流數組：
+* **現金流出 (Negative Flow)**： 每次買入股票日，金額為 `-(股價 × 股數 + 手續費)`。
+* **現金流入 (Positive Flow)**： 每次配息入帳日 (PayDate)，金額為 `+(實際入帳股息)`。若有賣出股票，則為 `+(賣出金額 - 手續費)`。
+* **期末結算 (Terminal Value)**： 以 今天日期 (Today) 為基準，新增一筆虛擬現金流入，金額為 `+(該標的當下總市值)`。
+
+將上述二維陣列 `[[Date1, Value1], [Date2, Value2], ..., [Today, CurrentValue]]` 帶入 Newton-Raphson 迭代演算法，解出折現率 $r$ 即為 XIRR。
+
+### 2. GAS 模組架構規劃 (Script Architecture)
+```text
+Wealth_Smith_GAS/
+├── Code.gs          // 系統主入口、自訂選單 (Custom Menu) 與觸發器綁定
+├── XIRREngine.gs    // 核心計算引擎：自動演算個股與整體 XIRR
+├── PriceFetcher.gs  // 股價抓取與備援機制 (GOOGLEFINANCE / Web Scraping)
+└── SheetSetup.gs    // 初始化工具：自動建立三張工作表、表頭格式與資料驗證規則
+```
+
+---
+
+## 四、 專案開工四步驟 (Implementation Roadmap)
+
+* **Phase 1: 試算表結構與格式初始化（Anti 執行中）**
+  * 建立 `Transactions`、`Dividends`、`Dashboard` 三張工作表與標準表頭。
+  * 設定資料驗證（日期格式、交易類型下拉選單）與條件式格式。
+* **Phase 2: 基礎試算表公式與現價整合**
+  * 設定各表內部自動加減與累計公式。
+  * 導入 `GOOGLEFINANCE` 抓取當前報價。
+* **Phase 3: GAS XIRR 核心演算法與自訂函數開發**
+  * 寫入 `XIRREngine.gs`，實現支援跨表整合的 XIRR 計算。
+  * 於 Dashboard 產出動態 XIRR 結果。
+* **Phase 4: 自動化觸發與使用者體驗優化**
+  * 新增 Google Sheets 頂部選單「Wealth_Smith 儀表板」。
+  * 設定每日收盤自動更新與股息發放提醒通知。
