@@ -106,6 +106,9 @@ Wealth_Smith_GAS/
 * **Phase 4: 自動化觸發與使用者體驗優化（✅ 已完成）**
   * 新增 Google Sheets 頂部選單「Wealth_Smith 儀表板」。
   * 實作 `setupDailyTrigger()` 設定每日 14:30 收盤自動更新與 CI/CD `clasp push` / `clasp deploy` 自動化部署。
+* **Phase 5: 獨立 Web App 簡易記帳介面包裹層（規劃中 / Roadmap）**
+  * 於 GAS 開發 `doGet()` / `doPost()` Web App API，支援跨域（CORS）接收 JSON 交易與股息寫入請求。
+  * 打造前端獨立極簡 Web App 介面 (如 GitHub Pages)，使用者僅需填入 GAS Web App 部署網址 (Web App URL)，即可實現無需開啟 Google Sheets 的手機/電腦一鍵快速記帳功能。
 
 ---
 
