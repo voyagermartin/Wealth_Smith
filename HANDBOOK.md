@@ -52,7 +52,7 @@
 | 總當下市值 | 各個股（累積股數 × 當前即時股價）之總和 |
 | 總損益 (Unrealized + Dividend) | (總當下市值 + 總股息收入) - 總投入成本 |
 | 總報酬率 (%) | 總損益 / 總投入成本 |
-| 整體 XIRR (%) | 由 GAS 整合所有歷史交易買賣現金流(-)、歷史股息現金流(+)與今日當下總市值(+)進行不定期現金流內部報酬率演算。 |
+| 整體 XIRR (%) | 由 GAS 整合所有歷史交易買賣現金流(-)、歷史股息現金流(+)與今日當下總市值(+)進行不定期現金流內部報酬率演算（支援 `=PORTFOLIO_XIRR()` 自訂公式）。 |
 
 #### (B) 個股彙整表 (Per-Stock Breakdowns)
 | 欄位 | 計算來源與說明 |
@@ -61,11 +61,11 @@
 | 個股總投入成本 | 該標的於 Transactions 之買入金額與手續費加總 |
 | 累積股數 | 該標的（買進股數 - 賣出股數）之累計值 |
 | 平均持股成本 | 個股總投入成本 / 累積股數 |
-| 當前現價 | 由 GOOGLEFINANCE("TICKER", "price") 或 GAS 爬蟲即時更新 |
+| 當前現價 | 由 `=IFERROR(GOOGLEFINANCE("TPE:" & SUBSTITUTE(A10, ".TW", ""), "price"), PriceFetcher_Backup(A10))` 即時更新，具備數值合理性過濾與雙重 API 備援 |
 | 個股目前總市值 | 累積股數 × 當前現價 |
 | 個股總股息收入 | 該標的於 Dividends 之總股利加總 |
 | 個股總報酬率 (%) | [(個股目前總市值 + 個股總股息收入) - 個股總投入成本] / 個股總投入成本 |
-| 個股 XIRR (%) | 由 GAS 提取該標的專屬之交易現金流、股息現金流及今日變現市值進行計算。 |
+| 個股 XIRR (%) | 由 GAS 提取該標的專屬之交易現金流、股息現金流及今日變現市值進行計算（支援 `=STOCK_XIRR(A10)` 自訂公式）。 |
 
 ---
 
@@ -82,11 +82,11 @@ XIRR 需要建構嚴謹的時間軸與帶符號現金流數組：
 ### 2. GAS 模組架構規劃 (Script Architecture)
 ```text
 Wealth_Smith_GAS/
-├── Wealth_Smith.gs  // 系統主入口、自訂頂部選單與每日收盤觸發器 (setupDailyTrigger)
+├── Wealth_Smith.gs  // 系統主入口、自訂頂部選單、全功能單檔備援整合與每日收盤觸發器 (setupDailyTrigger)
 ├── SheetSetup.gs    // 初始化工具：自動建立三張工作表 (Transactions, Dividends, Dashboard) 與格式驗證
-├── XIRREngine.gs    // 核心計算引擎：Newton-Raphson 演算法，自動精算個股與全域 XIRR
-├── PriceFetcher.gs  // 股價抓取與備援機制 (Yahoo Finance API / 證交所 TWSE API)
-├── .clasp.json      // Google Clasp 專案部署設定檔
+├── XIRREngine.gs    // 核心計算引擎：Newton-Raphson 演算法，支援 STOCK_XIRR 與 PORTFOLIO_XIRR 自訂公式
+├── PriceFetcher.gs  // 股價抓取與備援機制 (PriceFetcher_Backup 自訂函式 / TWSE OpenAPI / Yahoo Finance / isPriceAnomalous 合理性過濾)
+├── .clasp.json      // Google Clasp 專案部署設定檔 (綁定特定 Sheet 專案 ID)
 └── appsscript.json  // GAS 時區 (Asia/Taipei) 與執行環境設定檔
 ```
 
@@ -99,13 +99,13 @@ Wealth_Smith_GAS/
   * 設定資料驗證（日期格式、交易類型下拉選單）與條件式格式。
 * **Phase 2: 基礎試算表公式與現價整合（✅ 已完成）**
   * 設定各表內部自動加減與累計公式。
-  * 導入 `GOOGLEFINANCE` 與 `PriceFetcher` 抓取當前報價。
+  * 導入 `GOOGLEFINANCE("TPE:...")` 與 `PriceFetcher_Backup` 抓取當前報價。
 * **Phase 3: GAS XIRR 核心演算法與自訂函數開發（✅ 已完成）**
   * 寫入 `XIRREngine.gs`，實現支援跨表整合的 Newton-Raphson XIRR 計算。
-  * 於 Dashboard 產出動態 XIRR 結果。
+  * 開發 `=STOCK_XIRR(ticker)` 與 `=PORTFOLIO_XIRR()` 自訂公式於 Dashboard 產出動態 XIRR 結果。
 * **Phase 4: 自動化觸發與使用者體驗優化（✅ 已完成）**
   * 新增 Google Sheets 頂部選單「Wealth_Smith 儀表板」。
-  * 實作 `setupDailyTrigger()` 設定每日 14:30 收盤自動更新與 CI/CD `clasp push` 自動化部署。
+  * 實作 `setupDailyTrigger()` 設定每日 14:30 收盤自動更新與 CI/CD `clasp push` / `clasp deploy` 自動化部署。
 
 ---
 
@@ -125,3 +125,14 @@ Wealth_Smith_GAS/
   * 開發 `Wealth_Smith.gs` 系統主入口，於 Google Sheets 注入「Wealth_Smith 儀表板」自訂選單。
   * 實作 `setupDailyTrigger()` 函數，可一鍵設定每日 14:30 股市收盤自動背景更新。
   * 配置 `.clasp.json` 與 `.claspignore`，完成 Google Clasp CLI 工具繫結授權，實現全自動一鍵部署程式碼至 Google Sheet 線上 Apps Script 專案。
+
+### 📅 2026-08-10
+* **現價抓取機制優化與 GOOGLEFINANCE 格式修正**：
+  * 將 Dashboard 現價預設公式修正為 `=IFERROR(GOOGLEFINANCE("TPE:" & SUBSTITUTE(A10, ".TW", ""), "price"), PriceFetcher_Backup(A10))`，採用 `TPE:` 前綴提升台股報價穩定度。
+  * 於 `PriceFetcher.gs` 開發 `PriceFetcher_Backup(ticker)` 自訂函式，整合台灣證交所 (TWSE) OpenAPI (`mis.twse.com.tw`) 與 Yahoo Finance API 作為多重備援機制。
+  * 新增 `isPriceAnomalous` 數值合理性檢查過濾（如 0056.TW 價格需介於 10~200 元之間，一般台股 ≤ 5000 元），避免極端異常報價（如 600 元）影響總市值與 XIRR 計算。
+* **自訂公式引擎開發 (`STOCK_XIRR` & `PORTFOLIO_XIRR`)**：
+  * 於 `XIRREngine.gs` 新增 `=STOCK_XIRR(ticker)` 與 `=PORTFOLIO_XIRR()` 自訂公式，實現無需手動點選選單、輸入交易即可自動即時精算個股與整體投資組合 XIRR 之功能。
+* **Clasp 部署架構與專案綁定校正**：
+  * 排除多副檔名 (`.js`/`.gs`) 上傳衝突問題，確立 `.gs` 模組導向與 `.claspignore` 規則。
+  * 校正 `.clasp.json` 綁定之雲端 Apps Script `scriptId` (`1hKL8YRW3vXj7wm6eShnZmZT_PxjZWdlpC4fpJADFWUIKIZN9vUy1Kx7X`)，並將所有模組整合至 `Wealth_Smith.gs` 作為全功能單檔備援，完成 `Version 1.0` 雲端正式版本發布。
