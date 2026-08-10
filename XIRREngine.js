@@ -256,6 +256,59 @@ function calculatePortfolioXIRR(ss) {
 }
 
 /**
+ * Custom Function for Google Sheets formula to calculate XIRR for a specific stock.
+ * Formula usage: =STOCK_XIRR(A10)
+ * @customfunction
+ * @param {string} ticker Stock ticker e.g. "0056.TW"
+ * @returns {number|string} XIRR rate decimal
+ */
+function STOCK_XIRR(ticker) {
+  if (!ticker) return "";
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var dashSheet = ss.getSheetByName('Dashboard');
+    var currentPrice = 0;
+    var currentShares = 0;
+    
+    if (dashSheet) {
+      var data = dashSheet.getDataRange().getValues();
+      for (var r = 9; r < data.length; r++) {
+        if (data[r][0] && data[r][0].toString().trim() === ticker) {
+          currentShares = parseFloat(data[r][3]) || 0;
+          currentPrice = parseFloat(data[r][5]) || 0;
+          break;
+        }
+      }
+    }
+    
+    if (currentPrice <= 0 || isPriceAnomalous(ticker, currentPrice)) {
+      currentPrice = getCurrentPrice(ticker);
+    }
+    
+    var rate = calculateStockXIRR(ss, ticker.toString().trim(), currentPrice, currentShares);
+    return rate;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
+ * Custom Function for Google Sheets formula to calculate overall portfolio XIRR.
+ * Formula usage: =PORTFOLIO_XIRR()
+ * @customfunction
+ * @returns {number|string} Portfolio XIRR rate decimal
+ */
+function PORTFOLIO_XIRR() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var rate = calculatePortfolioXIRR(ss);
+    return rate;
+  } catch (e) {
+    return 0;
+  }
+}
+
+/**
  * Main batch runner: Updates all XIRR values in the Dashboard tab.
  */
 function updateAllXIRR() {
