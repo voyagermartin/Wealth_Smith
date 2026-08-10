@@ -198,13 +198,13 @@ function setupDashboardSheet(ss) {
   // Row 10 測試個股 (2330.TW) 動態公式
   sheet.getRange('A10').setValue('2330.TW').setHorizontalAlignment('center');
   sheet.getRange('B10').setValue('台積電').setHorizontalAlignment('center');
-  sheet.getRange('C10').setFormula('=SUMIFS(Transactions!G:G, Transactions!B:B, A10, Transactions!D:D, "買入") + SUMIFS(Transactions!H:H, Transactions!B:B, A10)');
+  sheet.getRange('C10').setFormula('=SUMIFS(Transactions!G:G, Transactions!B:B, A10, Transactions!D:D, "買入") + SUMIFS(Transactions!H:H, Transactions!B:B, A10, Transactions!D:D, "買入")');
   sheet.getRange('D10').setFormula('=SUMIFS(Transactions!F:F, Transactions!B:B, A10, Transactions!D:D, "買入") - SUMIFS(Transactions!F:F, Transactions!B:B, A10, Transactions!D:D, "賣出")');
-  sheet.getRange('E10').setFormula('=IF(D10=0, 0, C10/D10)');
+  sheet.getRange('E10').setFormula('=IF(D10=0, 0, C10/SUMIFS(Transactions!F:F, Transactions!B:B, A10, Transactions!D:D, "買入"))');
   sheet.getRange('F10').setFormula('=IF(ISBLANK(A10), "", IFERROR(GOOGLEFINANCE("TPE:" & SUBSTITUTE(A10, ".TW", ""), "price"), PriceFetcher_Backup(A10)))');
   sheet.getRange('G10').setFormula('=IF(ISBLANK(A10), "", D10*F10)');
   sheet.getRange('H10').setFormula('=SUMIFS(Dividends!F:F, Dividends!C:C, A10)');
-  sheet.getRange('I10').setFormula('=IF(C10=0, 0, ((G10+H10)-C10)/C10)');
+  sheet.getRange('I10').setFormula('=IF(C10=0, 0, ((G10+H10+(SUMIFS(Transactions!G:G, Transactions!B:B, A10, Transactions!D:D, "賣出")-SUMIFS(Transactions!H:H, Transactions!B:B, A10, Transactions!D:D, "賣出")))-C10)/C10)');
   sheet.getRange('J10').setValue('計算中...').setHorizontalAlignment('center').setFontColor('#718096');
   
   // 欄位格式
